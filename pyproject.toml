@@ -35,3 +35,8 @@ py-upgrade = "upgrade_tool.main:app"
 # --- ADD THIS SECTION ---
 [tool.hatch.build.targets.wheel]
 packages = ["upgrade_tool"]
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0"
+]
