@@ -31,3 +31,7 @@ dependencies = [
 
 [project.scripts]
 py-upgrade = "upgrade_tool.main:app"
+
+# --- ADD THIS SECTION ---
+[tool.hatch.build.targets.wheel]
+packages = ["upgrade_tool"]
