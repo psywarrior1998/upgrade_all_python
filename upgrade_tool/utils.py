@@ -11,7 +11,8 @@ console = Console()
 def get_outdated_packages() -> List[dict]:
     """
     Retrieves a list of outdated packages using pip's JSON output format.
-    
+    Handles both single JSON array and line-delimited JSON outputs for compatibility.
+
     Returns:
         A list of dictionaries, where each dictionary represents an outdated package.
         
@@ -19,7 +20,6 @@ def get_outdated_packages() -> List[dict]:
         SystemExit: If pip command fails or is not found.
     """
     try:
-        # Use pip's JSON format for reliable parsing
         command = [sys.executable, "-m", "pip", "list", "--outdated", "--format=json"]
         process = subprocess.Popen(
             command,
@@ -34,18 +34,24 @@ def get_outdated_packages() -> List[dict]:
             console.print(f"[bold red]Error running pip:[/bold red]\n{stderr}")
             raise SystemExit(1)
         
-        # If stdout is empty, no packages are outdated
-        if not stdout.strip():
+        output = stdout.strip()
+        if not output:
             return []
             
-        # Pip's JSON output might be a single line or multiple lines of JSON objects
-        return [json.loads(line) for line in stdout.strip().split('\n')]
+        # First, try to parse the entire output as a single JSON array.
+        # This is the modern format for pip.
+        try:
+            return json.loads(output)
+        except json.JSONDecodeError:
+            # If that fails, fall back to parsing line-by-line.
+            # This handles older pip versions or unexpected formats.
+            return [json.loads(line) for line in output.split('\n')]
 
     except FileNotFoundError:
         console.print("[bold red]Fatal Error:[/bold red] `pip` is not installed or not in your PATH.")
         raise SystemExit(1)
-    except json.JSONDecodeError:
-        console.print("[bold red]Fatal Error:[/bold red] Could not parse pip's output. Your pip version might be too old.")
+    except Exception as e:
+        console.print(f"[bold red]An unexpected error occurred while parsing pip output:[/bold red] {e}")
         raise SystemExit(1)
 
 def generate_packages_table(packages: List[dict], title: str) -> Table:
@@ -70,5 +76,10 @@ def generate_packages_table(packages: List[dict], title: str) -> Table:
     table.add_column("Latest Version", style="green")
 
     for pkg in packages:
-        table.add_row(pkg.get('name'), pkg.get('version'), pkg.get('latest_version'))
+        # Using .get() provides safety against missing keys, returning None instead of erroring.
+        table.add_row(
+            pkg.get('name'), 
+            pkg.get('version'), 
+            pkg.get('latest_version')
+        )
     return table
