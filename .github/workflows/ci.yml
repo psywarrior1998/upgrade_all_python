@@ -14,20 +14,17 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install .  # Installs from pyproject.toml
-        pip install pytest
+        pip install ".[test]"  # Installs project and test dependencies
+
     - name: Test with pytest
       run: |
-        # We need to create a dummy test file for this to pass
-        # In a real scenario, you'd have actual tests.
-        mkdir tests
-        echo "def test_placeholder(): assert True" > tests/test_main.py
         pytest
