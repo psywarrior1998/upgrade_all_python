@@ -1,40 +1,50 @@
 from typer.testing import CliRunner
-from upgrade_tool.main import app  # Import the Typer app
+from upgrade_tool.main import app
+from upgrade_tool import utils
 
 # CliRunner is a utility from Typer for testing command-line applications
 runner = CliRunner()
 
-def test_app_dry_run_no_packages():
+def test_app_shows_up_to_date_message(monkeypatch):
     """
-    Tests the 'py-upgrade --dry-run' command when no packages are outdated.
-    It mocks the get_outdated_packages function to return an empty list.
+    Tests that the correct message is shown when no packages are outdated.
+    This test mocks `get_outdated_packages` to return an empty list.
     """
-    # This is a basic "smoke test" to ensure the command runs without crashing.
-    result = runner.invoke(app, ["--dry-run"])
+    # Create a mock function that returns an empty list
+    def mock_get_outdated():
+        return []
+
+    # Use monkeypatch to replace the real function with our mock
+    monkeypatch.setattr(utils, "get_outdated_packages", mock_get_outdated)
+
+    # Run the command
+    result = runner.invoke(app)
+
+    # Assert that the exit code is 0 (success) and the correct message is in the output
     assert result.exit_code == 0
     assert "All packages are up to date!" in result.stdout
 
-def test_app_exclusion():
+def test_app_exclusion_logic(monkeypatch):
     """
     Tests the --exclude functionality.
-    It mocks the get_outdated_packages function to return a fixed list of packages
-    and asserts that the excluded package is not in the final table.
+    This test mocks a fixed list of outdated packages to verify that the
+    exclusion logic works as intended.
     """
-    # In a real test suite, you would use pytest's monkeypatch to replace
-    # the 'get_outdated_packages' function.
-    # For now, this placeholder shows the intent.
+    # Create a mock function that returns a predefined list of packages
+    def mock_get_outdated():
+        return [
+            {'name': 'requests', 'version': '2.25.0', 'latest_version': '2.28.0'},
+            {'name': 'numpy', 'version': '1.20.0', 'latest_version': '1.23.0'}
+        ]
+
+    # Use monkeypatch to replace the real function with our mock
+    monkeypatch.setattr(utils, "get_outdated_packages", mock_get_outdated)
+
+    # Run the command with the --exclude flag and --dry-run to prevent actual upgrades
+    result = runner.invoke(app, ["--exclude", "requests", "--dry-run"])
     
-    # Example using monkeypatch (you would need to write the test logic)
-    # def mock_get_outdated():
-    #     return [
-    #         {'name': 'requests', 'version': '2.25.0', 'latest_version': '2.28.0'},
-    #         {'name': 'numpy', 'version': '1.20.0', 'latest_version': '1.23.0'}
-    #     ]
-    # monkeypatch.setattr("upgrade_tool.main.get_outdated_packages", mock_get_outdated)
-    # result = runner.invoke(app, ["--exclude", "requests", "--dry-run"])
-    # assert result.exit_code == 0
-    # assert "requests" not in result.stdout
-    # assert "numpy" in result.stdout
-    
-    # Placeholder assertion
-    assert True
+    # Assertions
+    assert result.exit_code == 0
+    assert "requests" not in result.stdout  # The excluded package should NOT be in the output table
+    assert "numpy" in result.stdout        # The other package should be present
+    assert "1 packages selected" in result.stdout # The table caption should reflect the exclusion
