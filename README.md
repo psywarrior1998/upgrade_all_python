@@ -5,7 +5,7 @@
 
 An intelligent, feature-rich CLI tool to manage and upgrade Python packages with a clean, modern interface.
 
-![Screenshot of py-upgrade in action]  ## Key Features
+## Key Features
 
 - **Interactive & Beautiful UI**: Uses Rich to display outdated packages in a clean, readable table.
 - **Blazing Fast**: Upgrades packages with a clear progress bar.
@@ -14,6 +14,8 @@ An intelligent, feature-rich CLI tool to manage and upgrade Python packages with
 - **Automation Friendly**: A `--yes` flag allows for use in automated scripts.
 
 ## Installation
+
+The tool is now available on PyPI. Install it with pip:
 
 ```bash
 pip install ultimate-python-upgrader
