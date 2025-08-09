@@ -1,6 +1,5 @@
 from typer.testing import CliRunner
 from upgrade_tool.main import app
-from upgrade_tool import utils
 
 # CliRunner is a utility from Typer for testing command-line applications
 runner = CliRunner()
@@ -14,8 +13,8 @@ def test_app_shows_up_to_date_message(monkeypatch):
     def mock_get_outdated():
         return []
 
-    # Use monkeypatch to replace the real function with our mock
-    monkeypatch.setattr(utils, "get_outdated_packages", mock_get_outdated)
+    # Use monkeypatch to replace the function *where it is used* in the main module
+    monkeypatch.setattr("upgrade_tool.main.get_outdated_packages", mock_get_outdated)
 
     # Run the command
     result = runner.invoke(app)
@@ -37,12 +36,12 @@ def test_app_exclusion_logic(monkeypatch):
             {'name': 'numpy', 'version': '1.20.0', 'latest_version': '1.23.0'}
         ]
 
-    # Use monkeypatch to replace the real function with our mock
-    monkeypatch.setattr(utils, "get_outdated_packages", mock_get_outdated)
+    # Use monkeypatch to replace the function *where it is used* in the main module
+    monkeypatch.setattr("upgrade_tool.main.get_outdated_packages", mock_get_outdated)
 
     # Run the command with the --exclude flag and --dry-run to prevent actual upgrades
     result = runner.invoke(app, ["--exclude", "requests", "--dry-run"])
-    
+
     # Assertions
     assert result.exit_code == 0
     assert "requests" not in result.stdout  # The excluded package should NOT be in the output table
