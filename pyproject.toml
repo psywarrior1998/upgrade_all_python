@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ultimate-python-upgrader"
-version = "1.0.0"
+version = "1.1.0"
 authors = [
     { name="Your Name", email="your@email.com" },
 ]
