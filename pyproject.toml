@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ultimate-python-upgrader"
-version = "1.1.0"
+version = "1.2.0"
 authors = [
     { name="Your Name", email="your@email.com" },
 ]
-description = "An intelligent, feature-rich CLI tool to manage and upgrade Python packages."
+description = "An intelligent, feature-rich CLI tool to manage and upgrade Python packages with dependency analysis."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { file="LICENSE" }
@@ -32,11 +32,11 @@ dependencies = [
 [project.scripts]
 py-upgrade = "upgrade_tool.main:app"
 
-# --- ADD THIS SECTION ---
-[tool.hatch.build.targets.wheel]
-packages = ["upgrade_tool"]
 [project.optional-dependencies]
 test = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0"
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["upgrade_tool"]
