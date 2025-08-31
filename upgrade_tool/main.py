@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .utils import get_outdated_packages, generate_packages_table
 
-# --- New: Define status enums for clear results ---
+# --- Status enums for clear results ---
 class UpgradeStatus(Enum):
     SUCCESS = "SUCCESS"
     UPGRADE_FAILED = "UPGRADE_FAILED"
@@ -50,39 +50,42 @@ def check_for_conflicts(packages_to_check: List[str]) -> Optional[str]:
         return conflict_match.group(1).strip()
     return None
 
-def upgrade_package(pkg: Dict, no_rollback: bool) -> Tuple[str, str, UpgradeStatus, str]:
+def upgrade_package(pkg: Dict, no_rollback: bool) -> Tuple[str, str, UpgradeStatus, str, str]:
     """
     Worker function to upgrade a single package, with rollback on failure.
 
     Returns:
-        A tuple of (package_name, new_version, status_enum, original_version).
+        A tuple of (package_name, new_version, status_enum, original_version, error_message).
     """
     pkg_name = pkg['name']
     original_version = pkg['version']
     latest_version = pkg['latest_version']
+    error_message = ""
 
     try:
-        # Attempt the upgrade
-        subprocess.check_call(
+        # Use subprocess.run to capture output and check for errors
+        subprocess.run(
             [sys.executable, "-m", "pip", "install", "--upgrade", f"{pkg_name}"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            capture_output=True, text=True, check=True, encoding='utf-8'
         )
-        return pkg_name, latest_version, UpgradeStatus.SUCCESS, original_version
-    except subprocess.CalledProcessError:
-        # The upgrade failed.
+        return pkg_name, latest_version, UpgradeStatus.SUCCESS, original_version, ""
+    except subprocess.CalledProcessError as e:
+        # The upgrade failed. Capture the precise error from stderr.
+        error_message = e.stderr.strip()
         if no_rollback:
-            return pkg_name, latest_version, UpgradeStatus.UPGRADE_FAILED, original_version
+            return pkg_name, latest_version, UpgradeStatus.UPGRADE_FAILED, original_version, error_message
 
         # Attempt to roll back to the original version.
         try:
-            subprocess.check_call(
+            subprocess.run(
                 [sys.executable, "-m", "pip", "install", "--force-reinstall", f"{pkg_name}=={original_version}"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                capture_output=True, text=True, check=True, encoding='utf-8'
             )
-            return pkg_name, latest_version, UpgradeStatus.ROLLBACK_SUCCESS, original_version
-        except subprocess.CalledProcessError:
+            return pkg_name, latest_version, UpgradeStatus.ROLLBACK_SUCCESS, original_version, error_message
+        except subprocess.CalledProcessError as rollback_e:
             # The rollback itself failed, which is critical.
-            return pkg_name, latest_version, UpgradeStatus.ROLLBACK_FAILED, original_version
+            critical_error = f"Upgrade Error: {error_message}\nRollback Error: {rollback_e.stderr.strip()}"
+            return pkg_name, latest_version, UpgradeStatus.ROLLBACK_FAILED, original_version, critical_error
 
 @app.command()
 def upgrade(
@@ -96,35 +99,39 @@ def upgrade(
     """
     Checks for and concurrently upgrades outdated Python packages with dependency analysis and rollback-on-failure.
     """
-    # --- Filtering and Display Logic (Unchanged) ---
     outdated_packages = get_outdated_packages()
     if not outdated_packages:
         console.print("[bold green]✨ All packages are up to date! ✨[/bold green]")
         raise typer.Exit()
+
     if packages_to_upgrade:
         name_to_pkg = {pkg['name'].lower(): pkg for pkg in outdated_packages}
         target_packages = [name_to_pkg[name.lower()] for name in packages_to_upgrade if name.lower() in name_to_pkg]
     else:
         target_packages = outdated_packages
+
     if exclude:
         exclude_set = {name.lower() for name in exclude}
         target_packages = [pkg for pkg in target_packages if pkg['name'].lower() not in exclude_set]
+
     if not target_packages:
         console.print("[bold yellow]No packages match the specified criteria for upgrade.[/bold yellow]")
         raise typer.Exit()
+
     table = generate_packages_table(target_packages, title="Outdated Python Packages")
     console.print(table)
+
     if dry_run:
         console.print(f"\n[bold yellow]--dry-run enabled. Would simulate upgrade of {len(target_packages)} packages.[/bold yellow]")
         raise typer.Exit()
 
-    # --- Dependency Analysis and Confirmation (Unchanged) ---
     package_names = [pkg['name'] for pkg in target_packages]
     conflicts = check_for_conflicts(package_names)
     if conflicts:
         console.print(Panel.fit(f"[bold]The following dependency conflicts were found:[/bold]\n\n{conflicts}", title="[bold yellow]⚠️  Dependency Warning[/bold yellow]", border_style="yellow", padding=(1, 2)))
     else:
         console.print("[bold green]✅ No dependency conflicts detected.[/bold green]")
+
     if not yes:
         prompt_message = "\nProceed with the upgrade?"
         if conflicts:
@@ -138,7 +145,6 @@ def upgrade(
             console.print("\nUpgrade cancelled by user.")
             raise typer.Exit()
 
-    # --- Concurrent Execution with Detailed Reporting ---
     console.print(f"\n[bold blue]Starting parallel upgrade with {workers} workers...[/bold blue]")
     progress = Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console)
     
@@ -149,13 +155,14 @@ def upgrade(
         UpgradeStatus.ROLLBACK_FAILED: 0,
     }
     failed_rollbacks = []
+    failed_upgrades_no_rollback = []
 
     with progress:
         upgrade_task = progress.add_task("[green]Upgrading...", total=len(target_packages))
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_to_pkg = {executor.submit(upgrade_package, pkg, no_rollback): pkg for pkg in target_packages}
             for future in as_completed(future_to_pkg):
-                pkg_name, latest_version, status, original_version = future.result()
+                pkg_name, latest_version, status, original_version, error_msg = future.result()
                 results[status] += 1
 
                 if status == UpgradeStatus.SUCCESS:
@@ -164,23 +171,25 @@ def upgrade(
                     progress.console.print(f"  ↪️ [yellow]Failed to upgrade {pkg_name}, but successfully rolled back to {original_version}[/yellow]")
                 elif status == UpgradeStatus.UPGRADE_FAILED:
                     progress.console.print(f"  ❌ [red]Failed to upgrade {pkg_name}. Rollback was disabled.[/red]")
+                    failed_upgrades_no_rollback.append((pkg_name, error_msg))
                 elif status == UpgradeStatus.ROLLBACK_FAILED:
                     progress.console.print(f"  🚨 [bold red]CRITICAL: Failed to upgrade {pkg_name} AND failed to roll back to {original_version}. Your environment may be unstable.[/bold red]")
-                    failed_rollbacks.append(f"{pkg_name} (intended: {latest_version}, original: {original_version})")
+                    failed_rollbacks.append((pkg_name, error_msg))
 
                 progress.advance(upgrade_task)
 
-    # --- New Detailed Summary Report ---
     console.print("\n--- [bold]Upgrade Complete[/bold] ---")
     console.print(f"[green]Successful upgrades:[/green] {results[UpgradeStatus.SUCCESS]}")
     if results[UpgradeStatus.ROLLBACK_SUCCESS] > 0:
         console.print(f"[yellow]Failed upgrades (rolled back):[/yellow] {results[UpgradeStatus.ROLLBACK_SUCCESS]}")
     if results[UpgradeStatus.UPGRADE_FAILED] > 0:
         console.print(f"[red]Failed upgrades (no rollback):[/red] {results[UpgradeStatus.UPGRADE_FAILED]}")
+        for pkg_name, error in failed_upgrades_no_rollback:
+            console.print(f"  - [bold]{pkg_name}[/bold]: {error.splitlines()[0]}") # Show first line of error
     if results[UpgradeStatus.ROLLBACK_FAILED] > 0:
         console.print(f"[bold red]CRITICAL-FAILURE (unstable):[/bold red] {results[UpgradeStatus.ROLLBACK_FAILED]}")
-        for pkg_info in failed_rollbacks:
-            console.print(f"  - {pkg_info}")
+        for pkg_name, error in failed_rollbacks:
+            console.print(Panel(f"[bold]{pkg_name}[/bold]\n---\n{error}", title="[bold red]Detailed Error[/bold red]", border_style="red"))
     console.print("--------------------------")
 
 if __name__ == "__main__":
