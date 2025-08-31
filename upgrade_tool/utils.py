@@ -8,6 +8,7 @@ from rich.console import Console
 
 console = Console()
 
+
 def get_outdated_packages() -> List[dict]:
     """
     Retrieves a list of outdated packages using pip's JSON output format.
@@ -15,7 +16,7 @@ def get_outdated_packages() -> List[dict]:
 
     Returns:
         A list of dictionaries, where each dictionary represents an outdated package.
-        
+
     Raises:
         SystemExit: If pip command fails or is not found.
     """
@@ -26,18 +27,18 @@ def get_outdated_packages() -> List[dict]:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding='utf-8'
+            encoding="utf-8",
         )
         stdout, stderr = process.communicate()
 
         if process.returncode != 0:
             console.print(f"[bold red]Error running pip:[/bold red]\n{stderr}")
             raise SystemExit(1)
-        
+
         output = stdout.strip()
         if not output:
             return []
-            
+
         # First, try to parse the entire output as a single JSON array.
         # This is the modern format for pip.
         try:
@@ -45,14 +46,19 @@ def get_outdated_packages() -> List[dict]:
         except json.JSONDecodeError:
             # If that fails, fall back to parsing line-by-line.
             # This handles older pip versions or unexpected formats.
-            return [json.loads(line) for line in output.split('\n')]
+            return [json.loads(line) for line in output.split("\n")]
 
     except FileNotFoundError:
-        console.print("[bold red]Fatal Error:[/bold red] `pip` is not installed or not in your PATH.")
+        console.print(
+            "[bold red]Fatal Error:[/bold red] `pip` is not installed or not in your PATH."
+        )
         raise SystemExit(1)
     except Exception as e:
-        console.print(f"[bold red]An unexpected error occurred while parsing pip output:[/bold red] {e}")
+        console.print(
+            f"[bold red]An unexpected error occurred while parsing pip output:[/bold red] {e}"
+        )
         raise SystemExit(1)
+
 
 def generate_packages_table(packages: List[dict], title: str) -> Table:
     """
@@ -77,9 +83,5 @@ def generate_packages_table(packages: List[dict], title: str) -> Table:
 
     for pkg in packages:
         # Using .get() provides safety against missing keys, returning None instead of erroring.
-        table.add_row(
-            pkg.get('name'), 
-            pkg.get('version'), 
-            pkg.get('latest_version')
-        )
+        table.add_row(pkg.get("name"), pkg.get("version"), pkg.get("latest_version"))
     return table
