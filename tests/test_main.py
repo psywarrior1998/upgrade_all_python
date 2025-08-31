@@ -1,6 +1,6 @@
 import sys
 import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 from upgrade_tool.main import app, upgrade_package, UpgradeStatus
