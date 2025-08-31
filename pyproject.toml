@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "ultimate-python-upgrader"
 version = "1.3.0"
 authors = [
-    { name="Your Name", email="your@email.com" },
+    { name="Sanyam Sanjay Sharma", email="infta2020+pypi@gmail.com" },
 ]
 description = "An intelligent CLI tool to upgrade Python packages with dependency analysis and automatic rollback on failure."
 readme = "README.md"

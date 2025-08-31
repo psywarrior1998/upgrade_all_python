@@ -19,12 +19,42 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        
+
+    # --- NEW: Cache dependencies ---
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install ".[test]"  # Installs project and test dependencies
+        # Install black and ruff for linting/formatting
+        pip install ".[test]" black ruff
 
-    - name: Test with pytest
+    # --- NEW: Linter and Formatter Steps ---
+    - name: Check formatting with Black
       run: |
-        pytest
+        black --check .
+    - name: Lint with Ruff
+      run: |
+        ruff check .
+
+    - name: Test with pytest and generate coverage report
+      run: |
+        # Add --cov to measure code coverage
+        pytest --cov=upgrade_tool --cov-report=xml
+
+    # --- NEW (Optional but Recommended): Upload coverage report ---
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }} # You need to set this secret in your repo
+        file: ./coverage.xml
