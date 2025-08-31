@@ -1,8 +1,8 @@
 # Ultimate Python Upgrader (`py-upgrade`)
 
-[](https://badge.fury.io/py/ultimate-python-upgrader)
-[](https://github.com/psywarrior1998/upgrade_all_python/actions/workflows/ci.yml)
-[](https://opensource.org/licenses/MIT)
+[![PyPI version](https://badge.fury.io/py/ultimate-python-upgrader.svg)](https://badge.fury.io/py/ultimate-python-upgrader)
+[![CI](https://github.com/psywarrior1998/upgrade_all_python/actions/workflows/ci.yml/badge.svg)](https://github.com/psywarrior1998/upgrade_all_python/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 An intelligent, feature-rich CLI tool to manage and upgrade Python packages with a clean, modern interface and a powerful dependency safety-net.
 
